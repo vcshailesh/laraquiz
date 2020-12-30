@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Repositories\QuizRepository;
 use App\Http\Controllers\Controller;
 use App\Models\Quiz\UserQuizResult;
+use App\Rules\ExcelRule;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Excel;
@@ -62,12 +63,17 @@ class QuizController extends Controller
      */
     public function store(Request $request)
     {
+        if($request->has('import_questions')){
+            $request->validate([
+                'import_questions' => new ExcelRule($request->file('import_questions'))
+            ]);
+        }
+        
         $request->validate([
             'quiz_name' => 'required|unique:quizzes,quiz_name,NULL,id,admin_id,' . \Auth::id() . '|max:255',
             'time_limit' => 'required|date_format:i:s',
             'start_time' => 'required',
             'end_time' => 'required',
-            'import_questions' => 'mimetypes:application/vnd.ms-excel,application/vnd.oasis.opendocument.text,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'questions.*.question' => 'required:import_questions,NULL',
             'questions.*.options.*.option' => 'required:import_questions,NULL',
         ], [
@@ -75,10 +81,10 @@ class QuizController extends Controller
             'time_limit.date_format' => 'The quiz time should match the format MM:SS.',
             'questions.*.question.required' => 'The field is required.',
             'questions.*.options.*.option.required' => 'The field is required.',
-            'import_questions.mimetypes' => 'Choose only .xlsx, .xls, .odt file'
         ]);
 
         $inputs = $request->all();
+        
         if ($this->repo->create($inputs)) {
             return redirect()
                 ->route('admin.quiz.index')
